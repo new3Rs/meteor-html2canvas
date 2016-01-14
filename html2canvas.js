@@ -1,13 +1,13 @@
 /*
-  html2canvas 0.5.0-beta2 <http://html2canvas.hertzen.com>
-  Copyright (c) 2015 Niklas von Hertzen
+  html2canvas 0.5.0-beta3 <http://html2canvas.hertzen.com>
+  Copyright (c) 2016 Niklas von Hertzen
 
-  Released under MIT License
+  Released under  License
 */
 
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.html2canvas = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 (function (global){
-/*! https://mths.be/punycode v1.3.2 by @mathias */
+/*! https://mths.be/punycode v1.4.0 by @mathias */
 ;(function(root) {
 
 	/** Detect free variables */
@@ -73,7 +73,7 @@
 	 * @returns {Error} Throws a `RangeError` with the applicable error message.
 	 */
 	function error(type) {
-		throw RangeError(errors[type]);
+		throw new RangeError(errors[type]);
 	}
 
 	/**
@@ -220,7 +220,7 @@
 
 	/**
 	 * Bias adaptation function as per section 3.4 of RFC 3492.
-	 * http://tools.ietf.org/html/rfc3492#section-3.4
+	 * https://tools.ietf.org/html/rfc3492#section-3.4
 	 * @private
 	 */
 	function adapt(delta, numPoints, firstTime) {
@@ -525,14 +525,17 @@
 			return punycode;
 		});
 	} else if (freeExports && freeModule) {
-		if (module.exports == freeExports) { // in Node.js or RingoJS v0.8.0+
+		if (module.exports == freeExports) {
+			// in Node.js, io.js, or RingoJS v0.8.0+
 			freeModule.exports = punycode;
-		} else { // in Narwhal or RingoJS v0.7.0-
+		} else {
+			// in Narwhal or RingoJS v0.7.0-
 			for (key in punycode) {
 				punycode.hasOwnProperty(key) && (freeExports[key] = punycode[key]);
 			}
 		}
-	} else { // in Rhino or a web browser
+	} else {
+		// in Rhino or a web browser
 		root.punycode = punycode;
 	}
 
@@ -717,7 +720,7 @@ Color.prototype.hex6 = function(value) {
 };
 
 
-var _rgb = /^rgb\((\d{1,3}) *, *(\d{1,3}) *, *(\d{1,3})\)$/;
+var _rgb = /^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/;
 
 Color.prototype.rgb = function(value) {
     var match = null;
@@ -729,7 +732,7 @@ Color.prototype.rgb = function(value) {
     return match !== null;
 };
 
-var _rgba = /^rgba\((\d{1,3}) *, *(\d{1,3}) *, *(\d{1,3}) *, *(\d+\.?\d*)\)$/;
+var _rgba = /^rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d?\.?\d+)\s*\)$/;
 
 Color.prototype.rgba = function(value) {
     var match = null;
@@ -749,12 +752,13 @@ Color.prototype.toString = function() {
 };
 
 Color.prototype.namedColor = function(value) {
-    var color = colors[value.toLowerCase()];
+    value = value.toLowerCase();
+    var color = colors[value];
     if (color) {
         this.r = color[0];
         this.g = color[1];
         this.b = color[2];
-    } else if (value.toLowerCase() === "transparent") {
+    } else if (value === "transparent") {
         this.r = this.g = this.b = this.a = 0;
         return true;
     }
@@ -1212,10 +1216,14 @@ function GradientContainer(imageData) {
     this.promise = Promise.resolve(true);
 }
 
-GradientContainer.prototype.TYPES = {
+GradientContainer.TYPES = {
     LINEAR: 1,
     RADIAL: 2
 };
+
+// TODO: support hsl[a], negative %/length values
+// TODO: support <angle> (e.g. -?\d{1,3}(?:\.\d+)deg, etc. : https://developer.mozilla.org/docs/Web/CSS/angle )
+GradientContainer.REGEXP_COLORSTOP = /^\s*(rgba?\(\s*\d{1,3},\s*\d{1,3},\s*\d{1,3}(?:,\s*[0-9\.]+)?\s*\)|[a-z]{3,20}|#[a-f0-9]{3,6})(?:\s+(\d{1,3}(?:\.\d+)?)(%|px)?)?(?:\s|$)/i;
 
 module.exports = GradientContainer;
 
@@ -1403,16 +1411,15 @@ module.exports = ImageLoader;
 var GradientContainer = require('./gradientcontainer');
 var Color = require('./color');
 
-var COLOR_STOP_REGEXP = /^\s*(.*)\s*(\d{1,3})?(%|px)?$/;
-
 function LinearGradientContainer(imageData) {
     GradientContainer.apply(this, arguments);
-    this.type = this.TYPES.LINEAR;
+    this.type = GradientContainer.TYPES.LINEAR;
 
-    var hasDirection = imageData.args[0].match(this.stepRegExp) === null;
+    var hasDirection = LinearGradientContainer.REGEXP_DIRECTION.test( imageData.args[0] ) ||
+        !GradientContainer.REGEXP_COLORSTOP.test( imageData.args[0] );
 
     if (hasDirection) {
-        imageData.args[0].split(" ").reverse().forEach(function(position) {
+        imageData.args[0].split(/\s+/).reverse().forEach(function(position, index) {
             switch(position) {
             case "left":
                 this.x0 = 0;
@@ -1438,6 +1445,24 @@ function LinearGradientContainer(imageData) {
                 this.x1 = x0;
                 this.y1 = y0;
                 break;
+            case "center":
+                break; // centered by default
+            // Firefox internally converts position keywords to percentages:
+            // http://www.w3.org/TR/2010/WD-CSS2-20101207/colors.html#propdef-background-position
+            default: // percentage or absolute length
+                // TODO: support absolute start point positions (e.g., use bounds to convert px to a ratio)
+                var ratio = parseFloat(position, 10) * 1e-2;
+                if (isNaN(ratio)) { // invalid or unhandled value
+                    break;
+                }
+                if (index === 0) {
+                    this.y0 = ratio;
+                    this.y1 = 1 - this.y0;
+                } else {
+                    this.x0 = ratio;
+                    this.x1 = 1 - this.x0;
+                }
+                break;
             }
         }, this);
     } else {
@@ -1445,15 +1470,16 @@ function LinearGradientContainer(imageData) {
         this.y1 = 1;
     }
 
-    this.colorStops = imageData.args.slice(hasDirection ? 1 : 0)
-        .map(function(colorStop) { return colorStop.match(COLOR_STOP_REGEXP);})
-        .filter(function(colorStopMatch) { return !!colorStopMatch;})
-        .map(function(colorStopMatch) {
-            return {
-                color: new Color(colorStopMatch[1]),
-                stop: colorStopMatch[3] === "%" ? colorStopMatch[2] / 100 : null
-            };
-        });
+    this.colorStops = imageData.args.slice(hasDirection ? 1 : 0).map(function(colorStop) {
+        var colorStopMatch = colorStop.match(GradientContainer.REGEXP_COLORSTOP);
+        var value = +colorStopMatch[2];
+        var unit = value === 0 ? "%" : colorStopMatch[3]; // treat "0" as "0%"
+        return {
+            color: new Color(colorStopMatch[1]),
+            // TODO: support absolute stop positions (e.g., compute gradient line length & convert px to ratio)
+            stop: unit === "%" ? value / 100 : null
+        };
+    });
 
     if (this.colorStops[0].stop === null) {
         this.colorStops[0].stop = 0;
@@ -1463,6 +1489,7 @@ function LinearGradientContainer(imageData) {
         this.colorStops[this.colorStops.length - 1].stop = 1;
     }
 
+    // calculates and fills-in explicit stop positions when omitted from rule
     this.colorStops.forEach(function(colorStop, index) {
         if (colorStop.stop === null) {
             this.colorStops.slice(index).some(function(find, count) {
@@ -1479,7 +1506,8 @@ function LinearGradientContainer(imageData) {
 
 LinearGradientContainer.prototype = Object.create(GradientContainer.prototype);
 
-LinearGradientContainer.prototype.stepRegExp = /((?:rgb|rgba)\(\d{1,3},\s\d{1,3},\s\d{1,3}(?:,\s[0-9\.]+)?\))\s*(\d{1,3})?(%|px)?/;
+// TODO: support <angle> (e.g. -?\d{1,3}(?:\.\d+)deg, etc. : https://developer.mozilla.org/docs/Web/CSS/angle )
+LinearGradientContainer.REGEXP_DIRECTION = /^\s*(?:to|left|right|top|bottom|center|\d{1,3}(?:\.\d+)?%?)(?:\s|$)/i;
 
 module.exports = LinearGradientContainer;
 
@@ -3477,7 +3505,7 @@ var GradientContainer = require('./gradientcontainer');
 
 function WebkitGradientContainer(imageData) {
     GradientContainer.apply(this, arguments);
-    this.type = (imageData.args[0] === "linear") ? this.TYPES.LINEAR : this.TYPES.RADIAL;
+    this.type = imageData.args[0] === "linear" ? GradientContainer.TYPES.LINEAR : GradientContainer.TYPES.RADIAL;
 }
 
 WebkitGradientContainer.prototype = Object.create(GradientContainer.prototype);
